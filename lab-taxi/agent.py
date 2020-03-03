@@ -1,9 +1,10 @@
 import numpy as np
 from collections import defaultdict
+import random
+
 
 class Agent:
-
-    def __init__(self, nA=6):
+    def __init__(self, nA=6, epsilon_decay_steps=600000, alpha=0.025):
         """ Initialize agent.
 
         Params
@@ -12,6 +13,10 @@ class Agent:
         """
         self.nA = nA
         self.Q = defaultdict(lambda: np.zeros(self.nA))
+        self.epsilon = 1.0
+        self.alpha = alpha
+        self.epsilon_decay_steps = epsilon_decay_steps
+        self.step_counter = 0
 
     def select_action(self, state):
         """ Given the state, select an action.
@@ -24,7 +29,23 @@ class Agent:
         =======
         - action: an integer, compatible with the task's action space
         """
-        return np.random.choice(self.nA)
+        # print("agent.select_action() - state: {}".format(state))
+
+        self.step_counter += 1
+        # self.epsilon = max(0.1, 1.0-self.step_counter/self.epsilon_decay_steps)
+        epsilon_min = .01
+        epsilon_max = .8
+        epsilon_step = epsilon_max - (epsilon_max - epsilon_min) * self.step_counter / self.epsilon_decay_steps
+        self.epsilon = max(epsilon_min, epsilon_step)
+        # self.epsilon = max(0.1, 1.0/self.step_counter)
+
+        rand = random.uniform(0, 1)
+        if rand < self.epsilon:
+            # choose random action
+            return np.random.choice(self.nA)
+        else:
+            # choose greedy action
+            return np.argmax(self.Q[state])
 
     def step(self, state, action, reward, next_state, done):
         """ Update the agent's knowledge, using the most recently sampled tuple.
@@ -37,4 +58,10 @@ class Agent:
         - next_state: the current state of the environment
         - done: whether the episode is complete (True or False)
         """
-        self.Q[state][action] += 1
+        # print("agent.step() - state: {}, action: {}, reward: {}, next_state: {}, done: {}".format(state, action, reward, next_state, done))
+        current_reward_val = self.Q[state][action]
+        next_step_greedy_action = np.argmax(self.Q[next_state])
+        next_step_reward_val = self.Q[next_state][next_step_greedy_action]
+        gamma = 0.75  # toto - paramterize
+        self.Q[state][action] = self.Q[state][action] + self.alpha * (
+        reward + gamma * next_step_reward_val - self.Q[state][action])
